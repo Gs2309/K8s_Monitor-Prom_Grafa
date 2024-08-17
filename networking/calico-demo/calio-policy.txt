@@ -1,0 +1,57 @@
+kubectl get ns
+kubectl delete ns development
+nano namespace-development.yaml 
+
+# 1-namespace-development.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+  labels:
+    purpose: development
+
+kubectl apply -f namespace-development.yaml 
+kubectl run backend --image=nginx --labels app=webapp,role=backend --namespace development --expose --port 80 
+kubectl get all -n development
+kubectl run --rm -it --image=alpine frontend --namespace development # wget -qO- http://backend 
+
+nano network-policy-deny-all.yaml
+# 1-network-policy-deny-all.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: backend-policy
+  namespace: development
+spec:
+  podSelector:
+    matchLabels:
+      app: webapp
+      role: backend
+  ingress: []
+  
+kubectl apply -f network-policy-deny-all.yaml 
+
+kubectl run --rm -it --image=alpine frontend --namespace development # wget -qO- http://backend
+
+nano network-policy-allow-pod.yaml
+# 2-network-policy-allow-pod.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: backend-policy
+  namespace: development
+spec:
+  podSelector:
+    matchLabels:
+      app: webapp
+      role: backend
+  ingress:
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app: webapp
+          role: frontend
+		  
+kubectl apply -f network-policy-allow-pod.yaml 
+kubectl run --rm -it frontend --image=alpine --labels app=webapp,role=frontend --namespace development # wget -qO- http://backend
